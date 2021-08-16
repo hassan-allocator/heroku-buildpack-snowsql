@@ -1,0 +1,5 @@
+#!/bin/sh
+
+# valid for all
+echo "snowsql"
+exit 0

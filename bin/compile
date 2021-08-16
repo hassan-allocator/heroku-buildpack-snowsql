@@ -1,0 +1,46 @@
+#!/bin/sh
+
+indent() {
+  sed -u 's/^/       /'
+}
+
+echo "--------> Install snowsql"
+BUILD_DIR=$1
+VENDOR_DIR="${BUILD_DIR}/vendor/snowsql"
+BOOTSTRAP_VERSION=1.2
+VERSION=1.2.17
+FILENAME=snowsql-${VERSION}-linux_x86_64.bash
+DOWNLOAD_PATH="https://sfc-repo.snowflakecomputing.com/snowsql/bootstrap/${BOOTSTRAP_VERSION}/linux_x86_64/${FILENAME}"
+
+# https://docs.snowflake.com/en/user-guide/snowsql-install-config.html#installing-snowsql-on-linux-using-the-installer
+SIGNATURE_PATH="${DOWNLOAD_PATH}.sig"
+GPG_KEY_ID=37C7086698CB005C
+
+
+echo "Downloading binaries" | indent
+cd $BUILD_DIR
+mkdir -p $VENDOR_DIR
+cd $VENDOR_DIR
+wget --quiet $DOWNLOAD_PATH
+wget --quiet $SIGNATURE_PATH
+
+echo "Verifying signature" | indent
+echo "    Dont worry about the warning. See: https://docs.snowflake.com/en/user-guide/snowsql-install-config.html#installing-snowsql-on-linux-using-the-installer" | indent
+gpg --keyserver hkp://keyserver.ubuntu.com --recv-keys $GPG_KEY_ID
+gpg --verify $FILENAME.sig $FILENAME
+
+# delete asks for confirmation, and i can't see any option to do it 'quietly'. Since heroku creates a new dyno for deployment, pub key shouldn't be retained anyway
+# gpg --delete-key "Snowflake Computing"
+
+echo "Installing snowsql" | indent
+# fake a bash_profile for snowsql
+touch ${BUILD_DIR}/.bash_profile
+SNOWSQL_DEST=$VENDOR_DIR SNOWSQL_LOGIN_SHELL=${BUILD_DIR}/.bash_profile bash snowsql-${VERSION}-linux_x86_64.bash
+
+echo "Cleaning up" | indent
+PROFILE_PATH="$BUILD_DIR/.profile.d/snowsql.sh"
+mkdir -p $(dirname $PROFILE_PATH)
+echo 'export PATH="/app/vendor/snowsql:$PATH"' >> $PROFILE_PATH
+
+rm -f FILENAME FILENAME.sig
+
